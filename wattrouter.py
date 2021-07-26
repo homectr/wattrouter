@@ -3,13 +3,14 @@
 
 import paho.mqtt.client as mqtt
 import time
-import datetime
 import configparser
 import sys
 import getopt
 import signal
 import threading
 import logging
+import xml.etree.ElementTree as ET
+import http.client
 
 runScript = True  # global var managing script's loop cycle
 
@@ -62,7 +63,11 @@ class Config:
             elif opt in ("-c", "--config"):
                 self.configFile = arg
             elif opt in ("-v", "--verbose"):
-                self.logLevel = int(arg)
+                if arg == "1": self.logLevel = logging.FATAL
+                if arg == "2": self.logLevel = logging.ERROR
+                if arg == "3": self.logLevel = logging.WARNING
+                if arg == "4": self.logLevel = logging.INFO
+                if arg == "5": self.logLevel = logging.DEBUG
             elif opt in ("-l", "--logfile"):
                 self.logfile = arg
 
@@ -86,26 +91,30 @@ class Config:
         self.pollInterval = int(seccfg.get('interval', "15"))
 
 class App(threading.Thread):
-    def __init__(self, id, mqttClient):
+    def __init__(self, id, mqttClient, device):
+        print("Starting app")
+        threading.Thread.__init__(self)
         self.id = id
         self.log = logging.getLogger(name="app")
+        self.log.addHandler(logging.StreamHandler())
         self._mqtt = mqttClient
         self._mqtt_reconnect = 0  # reconnect count
         self._running = True
+        self._device = device
 
         self._mqtt.on_message = self._on_mqtt_message
         self._mqtt.on_publish = self._on_mqtt_publish
         self._mqtt.on_connect = self._on_mqtt_connect
         self._mqtt.on_disconnect = self._on_mqtt_disconnect
 
-        self.log.all("subscribing to MQTT channel", self.id+"/cmd")
+        self.log.info("subscribing to MQTT channel %s/cmd", self.id)
         self._mqtt.subscribe(self.id+"/cmd", 1)
 
     def _on_mqtt_connect(self, client, userdata, flags, rc):
         self.mqtt_connected = rc
         self._mqtt_reconnect = 0
         if rc != 0:
-            self.log.err("MQTT connection returned result="+rc)
+            self.log.error("MQTT connection returned result=%d",rc)
             self._mqtt_reconnect += 1
             if self._mqtt_reconnect > 12:
                 self._mqtt_reconnect = 12
@@ -116,28 +125,38 @@ class App(threading.Thread):
     def _on_mqtt_disconnect(self, client, userdata, rc):
         self._mqtt_reconnect = 1
         if rc != 0:
-            self.log.err("MQTT unexpected disconnection.")
+            self.log.error("MQTT unexpected disconnection.")
             self._mqtt_reconnect += 1
             self.mqtt_reconnect_delay = 10
 
     # display all incoming messages
     def _on_mqtt_message(self, client, userdata, message):
-        self.log.debug("MQTT message="+str(message.payload))
-        print("MQTT message="+str(message.payload))
+        handled = False
+        self.log.debug("MQTT message=%s",message.payload)
+        print("MQTT message=",message.payload)
+        handled = handled or self._device.handleMessage(message)
+
+        if not handled:
+            self.log.debug("MQTT message not handled message={}".format(message))
 
     def _on_mqtt_publish(self, client, userdata, mid):
-        self.log.debug("MQTT received=", mid)
+        self.log.debug("MQTT message id=%s", mid)
 
     def stop(self):
-        self.log.debug("Stopping app",self.id)
+        self.log.debug("Stopping app %s",self.id)
         self._running = False
+        self._device.stop()
+        self._mqtt.disconnect()
+        self._mqtt.loop_stop()
 
     def run(self):
+        print("App started")
+        self._device.start()
         while self._running:
             if self._mqtt_reconnect > 0:
                 self.log.warn("MQTT Reconnecting...")
                 self._mqtt.reconnect()
-            time.sleep(5)
+            time.sleep(1)
 
 
 class Wattrouter(threading.Thread):
@@ -150,33 +169,114 @@ class Wattrouter(threading.Thread):
     # how often will client sent alive information (in seconds)
     _aliveInterval = 60
 
-    def __init__(self, id, mqttClient, *, qos=1, wrhost="wattrouter"):
-
+    def __init__(self, id, mqttClient, wrConnection, *, qos=1, wrhost="wattrouter", interval=15):
+        print("Creating wattrouter")
+        threading.Thread.__init__(self)
         self._id = id
         self._mqtt = mqttClient  # mqtt client
+        self._wr = wrConnection
         self._log = logging.getLogger("wr")
+        self._log.addHandler(logging.StreamHandler())
         self._qos = qos
         self._running = True
+        self._wrhost = wrhost
+        self._pollInterval = interval
+
+        for i in range(1,7):
+            self._mqtt.subscribe("{id}/O{i}/T/set".format(id=self._id, i=i))
 
     def stop(self):
-        self._log.info("*** Wattrouter is shutting down", self._id)
+        self._log.info("*** Wattrouter is shutting down %s", self._id)
         self._running = False
 
-    def start(self):
-        self._log.info("*** Wattrouter is starting", self._id)
-        self._log.info("Host=%s", self.wrhost)
-
     def run(self):
+        print("Wattrouter started")
         while self._running:
             # request data from Wattrouter host
+            self._wr.request("GET","/meas.xml")
+            r = self._wr.getresponse()
+            if r.status != 200:
+                self._log.error("Error getting response from Wattrouter status=%d",r.status)
+                time.sleep(300)
+                continue
+
             # process data
+            data = r.read()
+            dataxml = ET.fromstring(data)
+            # process inputs
+            for i in range(1,8):
+                v = dataxml.findtext("./I{i}/P".format(i=i))
+                if v != None: self.publish("I{i}/P".format(i=i),v)
+                v = dataxml.findtext("./I{i}/E".format(i=i))
+                if v != None: self.publish("I{i}/E".format(i=i),v)
+
+            # process outputs
+            for i in range(1,7): 
+                v = dataxml.findtext("./O{i}/P".format(i=i))
+                if v != None: self.publish("O{i}/P".format(i=i),v)
+                v = dataxml.findtext("./O{i}/HN".format(i=i))
+                if v != None: self.publish("O{i}/HN".format(i=i),v)
+                v = dataxml.findtext("./O{i}/T".format(i=i))
+                if v != None: self.publish("O{i}/T".format(i=i),v)
+
+            # process temperature sensors
+            for i in range(1,5):
+                v = dataxml.findtext("./DQ{i}".format(i=i))
+                if v != None: self.publish("DQ{i}".format(i=i),v)
+
+            v = dataxml.findtext("./PPS") # total power
+            if v != None: 
+                self.publish("PPS",v)
+                self._log.debug("PPS=%s",v)
+            v = dataxml.findtext("./VAC") # L1 volatge
+            if v != None: self.publish("VAC",v)
+            v = dataxml.findtext("./EL1") # L1 voltage error
+            if v != None: self.publish("EL1",v)
+            v = dataxml.findtext("./ETS") # temperature sensors error
+            if v != None: self.publish("ETS",v)
+            v = dataxml.findtext("./ILT")
+            if v != None: self.publish("ILT",v)
+            v = dataxml.findtext("./ICW")
+            if v != None: self.publish("ICW",v)
+            v = dataxml.findtext("./ITS")
+            if v != None: self.publish("ITS",v)
+            v = dataxml.findtext("./IDST")
+            if v != None: self.publish("IDST",v)
+            v = dataxml.findtext("./ISC")
+            if v != None: self.publish("ISC",v)
+            v = dataxml.findtext("./SRT")
+            if v != None: self.publish("SRT",v)
+            v = dataxml.findtext("./DW")
+            if v != None: self.publish("DW",v)
+
             # sleep for poll-duration
-            time.sleep(self.pollInterval)
+            for i in range(self._pollInterval):
+                time.sleep(1)
+                if not self._running: break
 
     # publish a message
     def publish(self, topic, message, qos=1, retain=False):
         self._log.info("publishing topic=%s/%s message=%s", self._id, topic, message)
         mid = self._mqtt.publish(self._id+'/'+topic, message, qos, retain)[1]
+
+    def toggleTest(self, outputNo, value):
+        self._log.debug("Toggle no={no} v={v}".format(no=outputNo,v=value))
+        nvalue = "1" if value==1 or value=="1" or value==b'1' else "0"
+
+        self._wr.request("POST","/test.xml",headers = {'Content-Type': 'application/xml'}, body="<test><TST{no}>{value}</TST{no}><UN>admin</UN><UP>1234</UP></test>".format(no=outputNo,value=nvalue))
+        r = self._wr.getresponse()
+        if r.status != 200:
+            self._log.error("Error changing test status for output {no} to value {value}".format(no=outputNo, value=nvalue))
+            return
+        else:
+            self._log.debug("Output test toggle o={no} value={value}".format(no=outputNo,value=nvalue))
+            self.publish("O{i}/T".format(i=outputNo),nvalue)
+
+    def handleMessage(self,message):
+        for i in range(1,7):
+            if message.topic == "{id}/O{i}/T/set".format(id=self._id, i=i):
+                self.toggleTest(i,message.payload)
+                return True
 
 def stop_script_handler(msg, logger):
     logger.all(msg)
@@ -192,13 +292,14 @@ cfg = Config(sys.argv[1:])
 print("Going to connect to wattrouter host=", cfg.wrhost)
 
 # configure logging
-logging.basicConfig(filename=cfg.logfile, encoding="utf-8", level=cfg.logLevel, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# add console to logger output
-logging.addHandler(logging.StreamHandler())
+logging.basicConfig(filename=cfg.logfile, level=cfg.logLevel, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # create logger
 log = logging.getLogger('main')
+
+# add console to logger output
+log.addHandler(logging.StreamHandler())
+
 
 # handle gracefull end in case of service stop
 signal.signal(signal.SIGTERM, lambda signo,
@@ -214,20 +315,21 @@ mqttc = mqtt.Client(cfg.devId)
 mqttc.username_pw_set(cfg.username, cfg.password)
 mqttc.connect(cfg.serverUrl)
 
-# create default app object (handles generic mqtt)
-app = App(cfg.devId, mqttc)
-app.start()
+# start thread handling mqtt communication
+mqttc.loop_start()
+
+# create http connection to wattrouter device
+wrc = http.client.HTTPConnection(cfg.wrhost)
 
 # create object for gpio monitor
 print("Creating wattrouter device as", cfg.devId)
-device = Wattrouter(cfg.devId, mqttc,
+device = Wattrouter(cfg.devId, mqttc, wrc,
                    qos=cfg.qos,
-                   wrhost=cfg.wrhost)
+                   wrhost=cfg.wrhost, interval=cfg.pollInterval)
 
-device.start()
-
-# start thread handling mqtt communication
-mqttc.loop_start()
+# create default app object (handles generic mqtt)
+app = App(cfg.devId, mqttc, device)
+app.start()
 
 try:
     while runScript:
@@ -237,9 +339,6 @@ except KeyboardInterrupt:
     log.info("Signal SIGINT received.")
 
 # perform some cleanup
-log.info("Stopping device ", cfg.devId)
-device.stop()
-mqttc.disconnect()
-mqttc.loop_stop()
+log.info("Stopping device id=%s", cfg.devId)
 app.stop()
 log.info('Stopped.')
