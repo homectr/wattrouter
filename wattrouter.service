@@ -1,0 +1,11 @@
+[Unit]
+Description=Wattrouter MQTT Bridge
+
+[Service]
+WorkingDirectory=/opt/wattrouter
+ExecStart=/usr/bin/python3 /opt/pigpiomon/wattrouter.py -c /etc/pigpiomon.cfg -l /var/log/wattrouter.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
+After=network.target
