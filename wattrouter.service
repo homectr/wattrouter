@@ -1,5 +1,6 @@
 [Unit]
 Description=Wattrouter MQTT Bridge
+After=network.target
 
 [Service]
 WorkingDirectory=/opt/wattrouter
@@ -8,4 +9,3 @@ Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=default.target
-After=network.target
