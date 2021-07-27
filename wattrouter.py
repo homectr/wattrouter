@@ -86,7 +86,7 @@ class Config:
         self.username = seccfg.get('username')
         self.password = seccfg.get('password')
         self.devId = seccfg.get('id', 'wattrouter')
-        self.wrhost = seccfg.get('wrhost', 'wattrouter')
+        self.wrhost = seccfg.get('wrhost', '')
         self.qos = int(seccfg.get('qos', "1"))
         self.pollInterval = int(seccfg.get('interval', "15"))
 
@@ -238,11 +238,13 @@ class Wattrouter(threading.Thread):
             v = dataxml.findtext("./PPS") # total power
             if v != None: 
                 self.publish("PPS",v)
-                self._log.debug("PPS=%s",v)
+                self._log.info("PPS=%s",v)
             v = dataxml.findtext("./VAC") # L1 volatge
             if v != None: self.publish("VAC",v)
             v = dataxml.findtext("./EL1") # L1 voltage error
-            if v != None: self.publish("EL1",v)
+            if v != None: 
+                self.publish("EL1",v)
+                if v=="1": self._log.warning("Voltage error detected")
             v = dataxml.findtext("./ETS") # temperature sensors error
             if v != None: self.publish("ETS",v)
             v = dataxml.findtext("./ILT")
@@ -300,8 +302,6 @@ def stop_script_handler(msg, logger):
 # parse commandline aruments and read config file if specified
 cfg = Config(sys.argv[1:])
 
-print("Going to connect to wattrouter host=", cfg.wrhost)
-
 # configure logging
 logging.basicConfig(filename=cfg.logfile, level=cfg.logLevel, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -311,6 +311,12 @@ log = logging.getLogger('main')
 # add console to logger output
 log.addHandler(logging.StreamHandler())
 
+log.info("*** Wattrouter Bridge Starting")
+log.info("Wattrouter host=", cfg.wrhost)
+
+if cfg.wrhost == '':
+    log.fatal("Wattrouter host not specified in config file.")
+    exit(1)
 
 # handle gracefull end in case of service stop
 signal.signal(signal.SIGTERM, lambda signo,
@@ -352,4 +358,4 @@ except KeyboardInterrupt:
 # perform some cleanup
 log.info("Stopping device id=%s", cfg.devId)
 app.stop()
-log.info('Stopped.')
+log.info('Wattrouter stopped.')

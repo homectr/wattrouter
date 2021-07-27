@@ -48,7 +48,7 @@ sudo cp ./${svcname}.logrotate /etc/logrotate.d/${svcname}
 sudo systemctl restart logrotate
 
 echo "Creating service"
-sudo cp ./${svcname}.service /lib/systemd/system
+sudo cp ./${svcname}.service /etc/systemd/system
 sudo systemctl daemon-reload
 sudo systemctl enable ${svcname}.service
 
