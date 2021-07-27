@@ -292,7 +292,7 @@ class Wattrouter(threading.Thread):
                 return True
 
 def stop_script_handler(msg, logger):
-    logger.all(msg)
+    logger.info(msg)
     global runScript
     runScript = False
 
