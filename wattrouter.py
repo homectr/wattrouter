@@ -312,7 +312,7 @@ log = logging.getLogger('main')
 log.addHandler(logging.StreamHandler())
 
 log.info("*** Wattrouter Bridge Starting")
-log.info("Wattrouter host=", cfg.wrhost)
+log.info("Wattrouter host=%s", cfg.wrhost)
 
 if cfg.wrhost == '':
     log.fatal("Wattrouter host not specified in config file.")
