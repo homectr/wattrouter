@@ -95,55 +95,58 @@ class App(threading.Thread):
         print("Starting app")
         threading.Thread.__init__(self)
         self.id = id
-        self.log = logging.getLogger(name="app")
-        self.log.addHandler(logging.StreamHandler())
+        self._log = logging.getLogger(name="app")
+        self._log.addHandler(logging.StreamHandler())
         self._mqtt = mqttClient
         self._mqtt_reconnect = 0  # reconnect count
         self._running = True
         self._device = device
+        self._aliveTime = 0
+        self._aliveInterval = 1800
 
         self._mqtt.on_message = self._on_mqtt_message
         self._mqtt.on_publish = self._on_mqtt_publish
         self._mqtt.on_connect = self._on_mqtt_connect
         self._mqtt.on_disconnect = self._on_mqtt_disconnect
 
-        self.log.info("subscribing to MQTT channel %s/cmd", self.id)
+        self._log.info("subscribing to MQTT channel %s/cmd", self.id)
         self._mqtt.subscribe(self.id+"/cmd", 1)
 
     def _on_mqtt_connect(self, client, userdata, flags, rc):
         self.mqtt_connected = rc
         self._mqtt_reconnect = 0
         if rc != 0:
-            self.log.error("MQTT connection returned result=%d",rc)
+            self._log.error("MQTT connection returned result=%d",rc)
             self._mqtt_reconnect += 1
             if self._mqtt_reconnect > 12:
                 self._mqtt_reconnect = 12
             self.mqtt_reconnect_delay = 2**self._mqtt_reconnect
         else:
-            self.log.info("Connected to MQTT broker.")
+            self._log.info("Connected to MQTT broker.")
 
     def _on_mqtt_disconnect(self, client, userdata, rc):
         self._mqtt_reconnect = 1
         if rc != 0:
-            self.log.error("MQTT unexpected disconnection.")
+            self._log.error("MQTT unexpected disconnection.")
             self._mqtt_reconnect += 1
             self.mqtt_reconnect_delay = 10
 
     # display all incoming messages
     def _on_mqtt_message(self, client, userdata, message):
         handled = False
-        self.log.debug("MQTT message=%s",message.payload)
-        print("MQTT message=",message.payload)
+        self._log.debug("MQTT on_message=%s",message.payload)
+        print("MQTT on_message=",message.payload)
         handled = handled or self._device.handleMessage(message)
 
         if not handled:
-            self.log.debug("MQTT message not handled message={}".format(message))
+            self._log.debug("MQTT on_message not handled message={}".format(message))
 
     def _on_mqtt_publish(self, client, userdata, mid):
-        self.log.debug("MQTT message id=%s", mid)
+        # self.log.debug("MQTT on_publish mid=%s", mid)
+        return
 
     def stop(self):
-        self.log.debug("Stopping app %s",self.id)
+        self._log.debug("Stopping app %s",self.id)
         self._running = False
         self._device.stop()
         self._mqtt.disconnect()
@@ -153,8 +156,11 @@ class App(threading.Thread):
         print("App started")
         self._device.start()
         while self._running:
+            if time.time()-self._aliveTime > self._aliveInterval:
+                self._log.info("App alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
+                self._aliveTime = time.time()
             if self._mqtt_reconnect > 0:
-                self.log.warn("MQTT Reconnecting...")
+                self._log.warn("MQTT Reconnecting...")
                 self._mqtt.reconnect()
             time.sleep(1)
 
@@ -181,6 +187,8 @@ class Wattrouter(threading.Thread):
         self._running = True
         self._wrhost = wrhost
         self._pollInterval = interval
+        self._aliveTime
+        self._aliveInterval = 900
 
         for i in range(1,7):
             self._mqtt.subscribe("{id}/O{i}/T/set".format(id=self._id, i=i))
@@ -192,6 +200,9 @@ class Wattrouter(threading.Thread):
     def run(self):
         print("Wattrouter started")
         while self._running:
+            if time.time()-self._aliveTime > self._aliveInterval:
+                self._log.info("Wattrouter alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
+                self._aliveTime = time.time()
             # request data from Wattrouter host
             self._wr.request("GET","/meas.xml")
             r = self._wr.getresponse()
@@ -256,7 +267,7 @@ class Wattrouter(threading.Thread):
 
     # publish a message
     def publish(self, topic, message, qos=1, retain=False):
-        self._log.info("publishing topic=%s/%s message=%s", self._id, topic, message)
+        self._log.debug("publish topic=%s/%s message=%s", self._id, topic, message)
         mid = self._mqtt.publish(self._id+'/'+topic, message, qos, retain)[1]
 
     def toggleTest(self, outputNo, value):
