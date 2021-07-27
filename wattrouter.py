@@ -160,7 +160,7 @@ class App(threading.Thread):
                 self._log.info("App alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
                 self._aliveTime = time.time()
             if self._mqtt_reconnect > 0:
-                self._log.warn("MQTT Reconnecting...")
+                self._log.warning("MQTT Reconnecting...")
                 self._mqtt.reconnect()
             time.sleep(1)
 
