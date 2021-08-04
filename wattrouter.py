@@ -239,26 +239,38 @@ class Wattrouter(threading.Thread):
             if v != None: 
                 self.publish("PPS",v)
                 self._log.info("PPS=%s",v)
+            else:
+                self._log.error("Wrong response from wattrouter: PSS not present.")
+
             v = dataxml.findtext("./VAC") # L1 volatge
             if v != None: self.publish("VAC",v)
+
             v = dataxml.findtext("./EL1") # L1 voltage error
             if v != None: 
                 self.publish("EL1",v)
                 if v=="1": self._log.warning("Voltage error detected")
+
             v = dataxml.findtext("./ETS") # temperature sensors error
             if v != None: self.publish("ETS",v)
+
             v = dataxml.findtext("./ILT")
             if v != None: self.publish("ILT",v)
+
             v = dataxml.findtext("./ICW")
             if v != None: self.publish("ICW",v)
+
             v = dataxml.findtext("./ITS")
             if v != None: self.publish("ITS",v)
+
             v = dataxml.findtext("./IDST")
             if v != None: self.publish("IDST",v)
+
             v = dataxml.findtext("./ISC")
             if v != None: self.publish("ISC",v)
+
             v = dataxml.findtext("./SRT")
             if v != None: self.publish("SRT",v)
+
             v = dataxml.findtext("./DW")
             if v != None: self.publish("DW",v)
 
@@ -267,10 +279,14 @@ class Wattrouter(threading.Thread):
                 time.sleep(1)
                 if not self._running: break
 
+        self._log.info("Wattrouter loop ended.")
+
     # publish a message
     def publish(self, topic, message, qos=1, retain=False):
         self._log.debug("publish topic=%s/%s message=%s", self._id, topic, message)
-        mid = self._mqtt.publish(self._id+'/'+topic, message, qos, retain)[1]
+        rc = self._mqtt.publish(self._id+'/'+topic, message, qos, retain)
+        if not rc.is_published:
+            self._log.warning("Failed to publish to mqtt. topic=%s msg=%s",topic,message)
 
     def toggleTest(self, outputNo, value):
         self._log.debug("Toggle no={no} v={v}".format(no=outputNo,v=value))
