@@ -90,10 +90,9 @@ class Config:
         self.qos = int(seccfg.get('qos', "1"))
         self.pollInterval = int(seccfg.get('interval', "15"))
 
-class App(threading.Thread):
+class App():
     def __init__(self, id, mqttClient, device):
         print("Starting app")
-        threading.Thread.__init__(self)
         self.id = id
         self._log = logging.getLogger(name="app")
         self._log.addHandler(logging.StreamHandler())
@@ -153,31 +152,20 @@ class App(threading.Thread):
         self._mqtt.loop_stop()
 
     def run(self):
-        print("App started")
-        self._device.start()
-        while self._running:
-            if time.time()-self._aliveTime > self._aliveInterval:
-                self._log.info("App alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
-                self._aliveTime = time.time()
-            if self._mqtt_reconnect > 0:
-                self._log.warning("MQTT Reconnecting...")
-                self._mqtt.reconnect()
-            time.sleep(1)
+        if not self._running: return
+        if time.time()-self._aliveTime > self._aliveInterval:
+            self._log.info("App alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
+            self._aliveTime = time.time()
+        if self._mqtt_reconnect > 0:
+            self._log.warning("MQTT Reconnecting...")
+            self._mqtt.reconnect()
+        device.run()
 
 
-class Wattrouter(threading.Thread):
+class Wattrouter:
     
-    # if set to true, monitor will send gpio changes only
-    # if set to false, monitor will send gpio status together with alive update
-    _sendChangesOnly = False
-    
-    _aliveTime = 0
-    # how often will client sent alive information (in seconds)
-    _aliveInterval = 60
-
     def __init__(self, id, mqttClient, wrConnection, *, qos=1, wrhost="wattrouter", interval=15):
         print("Creating wattrouter")
-        threading.Thread.__init__(self)
         self._id = id
         self._mqtt = mqttClient  # mqtt client
         self._wr = wrConnection
@@ -186,8 +174,9 @@ class Wattrouter(threading.Thread):
         self._qos = qos
         self._running = True
         self._wrhost = wrhost
+        self._lastPoll = 0
         self._pollInterval = interval
-        self._aliveTime
+        self._aliveTime = 0
         self._aliveInterval = 900
 
         for i in range(1,7):
@@ -198,88 +187,83 @@ class Wattrouter(threading.Thread):
         self._running = False
 
     def run(self):
-        print("Wattrouter started")
-        while self._running:
-            if time.time()-self._aliveTime > self._aliveInterval:
-                self._log.info("Wattrouter alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
-                self._aliveTime = time.time()
-            # request data from Wattrouter host
-            self._wr.request("GET","/meas.xml")
-            r = self._wr.getresponse()
-            if r.status != 200:
-                self._log.error("Error getting response from Wattrouter status=%d",r.status)
-                time.sleep(300)
-                continue
+        if not self._running: return
+        if time.time()-self._lastPoll < self._pollInterval: return
 
-            # process data
-            data = r.read()
-            dataxml = ET.fromstring(data)
-            # process inputs
-            for i in range(1,8):
-                v = dataxml.findtext("./I{i}/P".format(i=i))
-                if v != None: self.publish("I{i}/P".format(i=i),v)
-                v = dataxml.findtext("./I{i}/E".format(i=i))
-                if v != None: self.publish("I{i}/E".format(i=i),v)
+        if time.time()-self._aliveTime > self._aliveInterval:
+            self._log.info("Wattrouter alive (%s) %s", self._aliveInterval, time.strftime("%Y-%m-%d %H:%M:%S"))
+            self._aliveTime = time.time()
 
-            # process outputs
-            for i in range(1,7): 
-                v = dataxml.findtext("./O{i}/P".format(i=i))
-                if v != None: self.publish("O{i}/P".format(i=i),v)
-                v = dataxml.findtext("./O{i}/HN".format(i=i))
-                if v != None: self.publish("O{i}/HN".format(i=i),v)
-                v = dataxml.findtext("./O{i}/T".format(i=i))
-                if v != None: self.publish("O{i}/T".format(i=i),v)
+        # request data from Wattrouter host
+        self._wr.request("GET","/meas.xml")
+        r = self._wr.getresponse()
+        if r.status != 200:
+            self._log.error("Error getting response from Wattrouter status=%d",r.status)
+        else:
+            self._lastPoll = time.time()
 
-            # process temperature sensors
-            for i in range(1,5):
-                v = dataxml.findtext("./DQ{i}".format(i=i))
-                if v != None: self.publish("DQ{i}".format(i=i),v)
+        # process data
+        data = r.read()
+        dataxml = ET.fromstring(data)
+        # process inputs
+        for i in range(1,8):
+            v = dataxml.findtext("./I{i}/P".format(i=i))
+            if v != None: self.publish("I{i}/P".format(i=i),v)
+            v = dataxml.findtext("./I{i}/E".format(i=i))
+            if v != None: self.publish("I{i}/E".format(i=i),v)
 
-            v = dataxml.findtext("./PPS") # total power
-            if v != None: 
-                self.publish("PPS",v)
-                self._log.info("PPS=%s",v)
-            else:
-                self._log.error("Wrong response from wattrouter: PSS not present.")
+        # process outputs
+        for i in range(1,7): 
+            v = dataxml.findtext("./O{i}/P".format(i=i))
+            if v != None: self.publish("O{i}/P".format(i=i),v)
+            v = dataxml.findtext("./O{i}/HN".format(i=i))
+            if v != None: self.publish("O{i}/HN".format(i=i),v)
+            v = dataxml.findtext("./O{i}/T".format(i=i))
+            if v != None: self.publish("O{i}/T".format(i=i),v)
 
-            v = dataxml.findtext("./VAC") # L1 volatge
-            if v != None: self.publish("VAC",v)
+        # process temperature sensors
+        for i in range(1,5):
+            v = dataxml.findtext("./DQ{i}".format(i=i))
+            if v != None: self.publish("DQ{i}".format(i=i),v)
 
-            v = dataxml.findtext("./EL1") # L1 voltage error
-            if v != None: 
-                self.publish("EL1",v)
-                if v=="1": self._log.warning("Voltage error detected")
+        v = dataxml.findtext("./PPS") # total power
+        if v != None: 
+            self.publish("PPS",v)
+            self._log.info("PPS=%s",v)
+        else:
+            self._log.error("Wrong response from wattrouter: PSS not present.")
 
-            v = dataxml.findtext("./ETS") # temperature sensors error
-            if v != None: self.publish("ETS",v)
+        v = dataxml.findtext("./VAC") # L1 volatge
+        if v != None: self.publish("VAC",v)
 
-            v = dataxml.findtext("./ILT")
-            if v != None: self.publish("ILT",v)
+        v = dataxml.findtext("./EL1") # L1 voltage error
+        if v != None: 
+            self.publish("EL1",v)
+            if v=="1": self._log.warning("Voltage error detected")
 
-            v = dataxml.findtext("./ICW")
-            if v != None: self.publish("ICW",v)
+        v = dataxml.findtext("./ETS") # temperature sensors error
+        if v != None: self.publish("ETS",v)
 
-            v = dataxml.findtext("./ITS")
-            if v != None: self.publish("ITS",v)
+        v = dataxml.findtext("./ILT")
+        if v != None: self.publish("ILT",v)
 
-            v = dataxml.findtext("./IDST")
-            if v != None: self.publish("IDST",v)
+        v = dataxml.findtext("./ICW")
+        if v != None: self.publish("ICW",v)
 
-            v = dataxml.findtext("./ISC")
-            if v != None: self.publish("ISC",v)
+        v = dataxml.findtext("./ITS")
+        if v != None: self.publish("ITS",v)
 
-            v = dataxml.findtext("./SRT")
-            if v != None: self.publish("SRT",v)
+        v = dataxml.findtext("./IDST")
+        if v != None: self.publish("IDST",v)
 
-            v = dataxml.findtext("./DW")
-            if v != None: self.publish("DW",v)
+        v = dataxml.findtext("./ISC")
+        if v != None: self.publish("ISC",v)
 
-            # sleep for poll-duration
-            for i in range(self._pollInterval):
-                time.sleep(1)
-                if not self._running: break
+        v = dataxml.findtext("./SRT")
+        if v != None: self.publish("SRT",v)
 
-        self._log.info("Wattrouter loop ended.")
+        v = dataxml.findtext("./DW")
+        if v != None: self.publish("DW",v)
 
     # publish a message
     def publish(self, topic, message, qos=1, retain=False):
@@ -362,10 +346,10 @@ device = Wattrouter(cfg.devId, mqttc, wrc,
 
 # create default app object (handles generic mqtt)
 app = App(cfg.devId, mqttc, device)
-app.start()
 
 try:
     while runScript:
+        app.run()
         time.sleep(1)
 
 except KeyboardInterrupt:
