@@ -164,11 +164,10 @@ class App():
 
 class Wattrouter:
     
-    def __init__(self, id, mqttClient, wrConnection, *, qos=1, wrhost="wattrouter", interval=15):
+    def __init__(self, id, mqttClient, *, qos=1, wrhost="wattrouter", interval=15):
         print("Creating wattrouter")
         self._id = id
         self._mqtt = mqttClient  # mqtt client
-        self._wr = wrConnection
         self._log = logging.getLogger("wr")
         self._log.addHandler(logging.StreamHandler())
         self._qos = qos
@@ -195,12 +194,15 @@ class Wattrouter:
             self._aliveTime = time.time()
 
         # request data from Wattrouter host
-        self._wr.request("GET","/meas.xml")
-        r = self._wr.getresponse()
+        # create http connection to wattrouter device
+        wrc = http.client.HTTPConnection(self._wrhost)
+        wrc.request("GET","/meas.xml")
+        r = wrc.getresponse()
         if r.status != 200:
             self._log.error("Error getting response from Wattrouter status=%d",r.status)
         else:
             self._lastPoll = time.time()
+        wrc.close()
 
         # process data
         data = r.read()
@@ -335,12 +337,9 @@ mqttc.connect(cfg.serverUrl)
 # start thread handling mqtt communication
 mqttc.loop_start()
 
-# create http connection to wattrouter device
-wrc = http.client.HTTPConnection(cfg.wrhost)
-
 # create object for gpio monitor
 print("Creating wattrouter device as", cfg.devId)
-device = Wattrouter(cfg.devId, mqttc, wrc,
+device = Wattrouter(cfg.devId, mqttc,
                    qos=cfg.qos,
                    wrhost=cfg.wrhost, interval=cfg.pollInterval)
 
