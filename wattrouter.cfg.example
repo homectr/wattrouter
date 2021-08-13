@@ -1,8 +1,0 @@
-[wattrouter]
-id=wattrouter
-host=localhost
-username=
-password=
-qos=1
-wrhost=
-interval=15
