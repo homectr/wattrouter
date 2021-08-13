@@ -8,6 +8,7 @@ const log = logger.child({ module: 'wattmgr' });
 let isRunning = true;
 
 mqtt.client.on('connect', function () {
+  if (mqtt.client.disconnecting) return;
   const topic = `${ENV.config.mqtt?.clientid ?? ''}/cmd`;
   log.info(`Subscribing to topic=${topic}`);
   mqtt.addHandler(topic, function (cmd): boolean {
