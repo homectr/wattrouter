@@ -5,8 +5,9 @@
 Requires:
 
 - node.js 14+
+- npm
 
-To install run `install.sh` script.
+To install run `bash install.sh` script.
 
 ## Starting
 
