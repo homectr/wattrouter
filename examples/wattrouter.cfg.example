@@ -1,0 +1,10 @@
+{
+  "mqtt": {
+    "clientid": "wattrouter",
+    "host": "tcp://my_mqtt_host.com",
+  },
+  "wattrouter": {
+    "host": "tcp://localhost",
+    "interval": 15000
+  }
+}

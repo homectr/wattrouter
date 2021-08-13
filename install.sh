@@ -24,36 +24,45 @@ function check_running {
     echo "error: not running"
 }
 
-echo "Checking if python3 is installed"
-python3 --version > /dev/null
+echo "Checking if npm is installed"
+npm --version > /dev/null
 check_installed
 
-echo "Checking if pip is installed"
-python3 -m pip --version > /dev/null
-check_installed
+echo "Installing required packages"
+npm install
 
-echo "Installing required python packages"
-python3 -m pip install paho-mqtt
+echo "Building app"
+npm run build
 
-echo "Copying script to /opt/${svcfld} folder"
-sudo mkdir /opt/${svcfld}
-sudo cp ./wattrouter.py /opt/${svcfld}
-
+if [ -f "/etc/${svcname}.cfg" ]; then
+echo "Keeping existing configuration file /etc/${svcname}.cfg"
+else
 echo "Copying default configuration to /etc"
-sudo cp ./${svcname}.cfg.example /etc/${svcname}.cfg
+sudo cp ./examples/${svcname}.cfg.example /etc/${svcname}.cfg
+fi
 
-echo "Creating log file and configuring logrotate"
+echo "Creating log file"
 sudo touch /var/log/${svcname}.log
-sudo cp ./${svcname}.logrotate /etc/logrotate.d/${svcname}
-sudo systemctl restart logrotate
 
+if [ -f "/etc/logrotate.d/${svcname}" ]; then
+echo "Keeping existing logrotate configuration /etc/logrotate.d/${svcname}"
+else
+echo "Configuring logrotate"
+sudo cp ./examples/${svcname}.logrotate /etc/logrotate.d/${svcname}
+sudo systemctl restart logrotate
+fi
+
+if [ -f "/etc/systemd/system/${svcname}.service" ]; then
+echo "Keeping existing service configuration /etc/systemd/system/${svcname}.service"
+else
 echo "Creating service"
-sudo cp ./${svcname}.service /etc/systemd/system
+sudo cp ./examples/${svcname}.service /etc/systemd/system
 sudo systemctl daemon-reload
 sudo systemctl enable ${svcname}.service
+fi
 
 echo "Starting service"
-sudo systemctl start ${svcname}.service
+sudo systemctl restart ${svcname}.service
 
 echo "Installation complete"
 echo "Modify script configuration in /etc/${svcname}.cfg"

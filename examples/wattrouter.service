@@ -1,0 +1,11 @@
+[Unit]
+Description=Wattrouter Bridge to MQTT
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/wattrouter
+ExecStart=/usr/bin/node /opt/wattrouter/dist/app.js -c /etc/wattrouter.cfg -l /var/log/wattrouter.log -v info
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
