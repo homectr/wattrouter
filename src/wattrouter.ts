@@ -45,15 +45,23 @@ export async function readWR() {
     // process inputs
     for (let i = 1; i < 8; i++) {
       const itm = `I${i}`;
-      if (json.meas[itm]) mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
+      if (json.meas[itm]) {
+        mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
+        log.debug(`Publish: ${itm}=${json.meas[itm]}`);
+      }
     }
     // process outputs
     for (let i = 1; i < 15; i++) {
       const itm = `O${i}`;
       if (json.meas[itm]) {
         mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
-        mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN.toFixed(2));
-        mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T.toFixed(2));
+        mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN);
+        mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T);
+        log.debug(
+          `Publish: ${itm} P=${json.meas[itm].P.toFixed(2)} HN=${json.meas[itm].HN} T=${
+            json.meas[itm].T
+          }`
+        );
       }
     }
 
@@ -71,18 +79,23 @@ export async function readWR() {
       'DQ3',
       'DQ4', // temp sensors
       'VAC', // voltage
-      'EL1', // L1 voltage error
-      'ETS',
-      'ILT',
-      'ICW',
-      'ITS',
-      'IDST',
-      'ISC',
-      'SRT',
-      'DW',
+      'EL1', // L1 voltage error 1/0
+      'ETS', // temperature sensor error 1/0
+      'ILT', // low-tariff indicator 1/0
+      'ICW', // combiwatt indicator 1/0
+      'ITS', // test indicator 1/0
+      'IDST', // daylight saving indicator 1/0
+      'ISC', // SCGateway module indicator 1/0
+      'SRT', // Sun rise time HH:MM
+      'DW', // day of week 0(Mon)-6(Sun)
     ];
 
-    for (const i in s) if (json.meas[i]) mqtt.client.publish(`${rt}/${i}`, json.meas[i]);
+    for (const i in s) {
+      if (json.meas[i]) {
+        log.debug(`Publishing ${s}=${json.meas[i]}`);
+        mqtt.client.publish(`${rt}/${i}`, json.meas[i]);
+      }
+    }
   } catch (error) {
     console.error(error);
   }
