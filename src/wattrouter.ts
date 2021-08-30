@@ -4,7 +4,7 @@ import * as ENV from './ENV';
 import axios from 'axios';
 import parser from 'fast-xml-parser';
 
-const log = logger.child({ module: 'wattmgr' });
+const log = logger.child({ module: 'wattrt' });
 let isRunning = true;
 
 mqtt.client.on('connect', function () {
@@ -57,8 +57,8 @@ export async function readWR() {
       const itm = `O${i}`;
       if (itm in json.meas) {
         mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
-        mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN);
-        mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T);
+        mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN.toString());
+        mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T.toString());
         log.debug(
           `Publish: ${itm} P=${json.meas[itm].P.toFixed(2)} HN=${json.meas[itm].HN} T=${
             json.meas[itm].T
@@ -90,16 +90,18 @@ export async function readWR() {
       'ISC', // SCGateway module indicator 1/0
       'SRT', // Sun rise time HH:MM
       'DW', // day of week 0(Mon)-6(Sun)
+      'DaR', // wattrouter date
+      'TiR', // wattrouter time
     ];
 
     for (const i of s) {
       if (i in json.meas) {
         log.debug(`Publish: ${i}=${json.meas[i]}`);
-        mqtt.client.publish(`${rt}/${i}`, json.meas[i]);
+        mqtt.client.publish(`${rt}/${i}`, json.meas[i].toString());
       }
     }
   } catch (error) {
-    console.error(error);
+    log.error(error.message);
   }
 }
 
