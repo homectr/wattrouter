@@ -45,15 +45,15 @@ export async function readWR() {
     // process inputs
     for (let i = 1; i < 8; i++) {
       const itm = `I${i}`;
-      if (json.meas[itm]) {
+      if (itm in json.meas) {
         mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
-        log.debug(`Publish: ${itm}=${json.meas[itm]}`);
+        log.debug(`Publish: ${itm}/P=${json.meas[itm].P.toFixed(2)}`);
       }
     }
     // process outputs
     for (let i = 1; i < 15; i++) {
       const itm = `O${i}`;
-      if (json.meas[itm]) {
+      if (itm in json.meas) {
         mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
         mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN);
         mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T);
@@ -66,7 +66,7 @@ export async function readWR() {
     }
 
     // total power
-    if (json.meas.PPS) {
+    if ('PPS' in json.meas) {
       mqtt.client.publish(`${rt}/PPS`, json.meas.PPS.toFixed(2));
       log.info(`PPS=${json.meas.PPS}`);
     } else {
@@ -91,8 +91,8 @@ export async function readWR() {
     ];
 
     for (const i in s) {
-      if (json.meas[i]) {
-        log.debug(`Publishing ${s}=${json.meas[i]}`);
+      if (i in json.meas) {
+        log.debug(`Publish: ${i}=${json.meas[i]}`);
         mqtt.client.publish(`${rt}/${i}`, json.meas[i]);
       }
     }
