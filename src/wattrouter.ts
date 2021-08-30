@@ -41,7 +41,9 @@ export async function readWR() {
       timeout: 1000,
       responseType: 'text',
     });
+    log.debug(`Received ${data}`);
     const json = parser.parse(data);
+    log.debug(`Parsed ${JSON.stringify(json)}`);
     // process inputs
     for (let i = 1; i < 8; i++) {
       const itm = `I${i}`;
