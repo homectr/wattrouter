@@ -90,7 +90,7 @@ export async function readWR() {
       'DW', // day of week 0(Mon)-6(Sun)
     ];
 
-    for (const i in s) {
+    for (const i of s) {
       if (i in json.meas) {
         log.debug(`Publish: ${i}=${json.meas[i]}`);
         mqtt.client.publish(`${rt}/${i}`, json.meas[i]);
