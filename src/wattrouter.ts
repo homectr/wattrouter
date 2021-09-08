@@ -113,6 +113,10 @@ function loop() {
   if (Date.now() - lastAlive > aliveInterval) {
     log.info('Wattrouter alive');
     lastAlive = Date.now();
+    mqtt.client.publish(`${ENV.config.mqtt?.clientid}/alive`, new Date().toISOString(), {
+      qos: 1,
+      retain: true,
+    });
   }
 
   if (Date.now() - lastRead > ENV.config.wattrouter.interval * 1000) {
