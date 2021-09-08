@@ -6,6 +6,8 @@ After=network.target
 WorkingDirectory=/opt/wattrouter
 ExecStart=/usr/bin/node /opt/wattrouter/dist/app.js -c /etc/wattrouter.cfg -l /var/log/wattrouter.log -v info
 Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5s
 
 [Install]
 WantedBy=default.target
