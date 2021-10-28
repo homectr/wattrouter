@@ -1,5 +1,5 @@
 /var/log/wattrouter.log {
-    size 5M
+    daily
     rotate 3
     missingok
     dateext
