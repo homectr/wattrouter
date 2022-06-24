@@ -57,6 +57,7 @@ echo "Keeping existing service configuration /etc/systemd/system/${svcname}.serv
 else
 echo "Creating service"
 sudo cp ./examples/${svcname}.service /etc/systemd/system
+sed -i "/^WorkingDirectory*/c\WorkingDirectory=${`pwd`}" /etc/systemd/system/${svcname}.service
 sudo systemctl daemon-reload
 sudo systemctl enable ${svcname}.service
 fi

@@ -4,7 +4,7 @@
   "description": "Bridge for Wattrouter device to MQTT",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon src/app.ts",
+    "dev": "ts-node src/app.ts --config ./local/config.cfg --logfile ./local/wattrtr.log --console --verbose 5",
     "start": "node dist/app.js",
     "build": "tsc -p ."
   },

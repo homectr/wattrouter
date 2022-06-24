@@ -2,7 +2,7 @@ import logger from './logger';
 import * as mqtt from './mqttclient';
 import * as ENV from './ENV';
 import axios from 'axios';
-import xmlparser from 'fast-xml-parser';
+import { XMLParser } from 'fast-xml-parser';
 
 const log = logger.child({ module: 'wattrt' });
 let isRunning = true;
@@ -34,7 +34,7 @@ export function stop() {
 
 export async function readWR() {
   const rt = ENV.config.mqtt.clientid;
-  const url = `http://${ENV.config.wattrouter.host}/meas.xml`;
+  const url = `${ENV.config.wattrouter.host}/meas.xml`;
   log.debug(`Connecting to wattrouter host=${url}`);
   let json: any;
   try {
@@ -43,7 +43,7 @@ export async function readWR() {
       responseType: 'text',
     });
     log.debug(`Received ${data}`);
-    const parser = new xmlparser.XMLParser();
+    const parser = new XMLParser();
     json = parser.parse(data);
   } catch (err: any) {
     if (err.response) {

@@ -4,7 +4,7 @@
     "host": "tcp://my_mqtt_host.com",
   },
   "wattrouter": {
-    "host": "tcp://localhost",
+    "host": "http://localhost",
     "interval": 15000
   }
 }
