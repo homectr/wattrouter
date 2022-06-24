@@ -1,5 +1,4 @@
 import fs from 'fs';
-import logger from './logger';
 const yargs = require('yargs');
 
 export const DEBUG = 'mqttc';
@@ -55,8 +54,6 @@ const defaultConfig: FileConfig = {
     interval: 5,
   },
 };
-
-const log = logger.child({ module: 'env' });
 
 export const config = readConfig(argv.config);
 
