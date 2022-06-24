@@ -62,11 +62,10 @@ export const config = readConfig(argv.config);
 
 export function readConfig(cfgFileName: string): FileConfig {
   const data = fs.readFileSync(cfgFileName, { encoding: 'utf8', flag: 'r' });
-  log.debug('Reading configuration from %s', cfgFileName);
+  console.log('Reading configuration from %s', cfgFileName);
   let cfg: FileConfig = defaultConfig;
   try {
     cfg = JSON.parse(data);
-    log.debug('Configuration=', JSON.stringify(cfg));
   } catch (err) {
     console.error(`Error reading configuration from ${cfgFileName} err=${err}`);
   }
