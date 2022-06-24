@@ -58,7 +58,7 @@ else
 echo "Creating service"
 sudo cp ./examples/${svcname}.service /etc/systemd/system
 curdir=`pwd`
-sed -i "/^WorkingDirectory*/c\WorkingDirectory=${curdir}" /etc/systemd/system/${svcname}.service
+sudo sed -i "/^WorkingDirectory*/c\WorkingDirectory=${curdir}" /etc/systemd/system/${svcname}.service
 sudo systemctl daemon-reload
 sudo systemctl enable ${svcname}.service
 fi
