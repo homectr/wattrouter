@@ -2,7 +2,7 @@ import logger from './logger';
 import * as mqtt from './mqttclient';
 import * as ENV from './ENV';
 import axios from 'axios';
-import parser from 'fast-xml-parser';
+import xmlparser from 'fast-xml-parser';
 
 const log = logger.child({ module: 'wattrt' });
 let isRunning = true;
@@ -43,6 +43,7 @@ export async function readWR() {
       responseType: 'text',
     });
     log.debug(`Received ${data}`);
+    const parser = new xmlparser.XMLParser();
     json = parser.parse(data);
   } catch (err: any) {
     if (err.response) {
