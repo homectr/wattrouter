@@ -33,75 +33,87 @@ export function stop() {
 }
 
 export async function readWR() {
+  const rt = ENV.config.mqtt.clientid;
+  const url = `http://${ENV.config.wattrouter.host}/meas.xml`;
+  log.debug(`Connecting to wattrouter host=${url}`);
+  let json: any;
   try {
-    const rt = ENV.config.mqtt.clientid;
-    const url = `http://${ENV.config.wattrouter.host}/meas.xml`;
-    log.debug(`Connecting to wattrouter host=${url}`);
     const { data } = await axios.get(url, {
       timeout: 1000,
       responseType: 'text',
     });
     log.debug(`Received ${data}`);
-    const json = parser.parse(data);
-    log.debug(`Parsed ${JSON.stringify(json)}`);
-    // process inputs
-    for (let i = 1; i < 8; i++) {
-      const itm = `I${i}`;
-      if (itm in json.meas) {
-        mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
-        log.debug(`Publish: ${itm}/P=${json.meas[itm].P.toFixed(2)}`);
-      }
-    }
-    // process outputs
-    for (let i = 1; i < 15; i++) {
-      const itm = `O${i}`;
-      if (itm in json.meas) {
-        mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
-        mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN.toString());
-        mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T.toString());
-        log.debug(
-          `Publish: ${itm} P=${json.meas[itm].P.toFixed(2)} HN=${json.meas[itm].HN} T=${
-            json.meas[itm].T
-          }`
-        );
-      }
-    }
-
-    // total power
-    if ('PPS' in json.meas) {
-      mqtt.client.publish(`${rt}/PPS`, json.meas.PPS.toFixed(2));
-      log.info(`PPS=${json.meas.PPS}`);
+    json = parser.parse(data);
+  } catch (err: any) {
+    if (err.response) {
+      log.error(`Wattrouter host ${ENV.config.wattrouter.host} returned error=${err.message}`);
+    } else if (err.request) {
+      log.error(
+        `Error connecting to Wattrouter host ${ENV.config.wattrouter.host}. error=${err.message}`
+      );
     } else {
-      log.error('PPS attribute not present.');
+      log.error(
+        `Error getting reponse from Wattrouter host ${ENV.config.wattrouter.host}. error=${err.message}`
+      );
     }
+  }
 
-    const s = [
-      'DQ1',
-      'DQ2',
-      'DQ3',
-      'DQ4', // temp sensors
-      'VAC', // voltage
-      'EL1', // L1 voltage error 1/0
-      'ETS', // temperature sensor error 1/0
-      'ILT', // low-tariff indicator 1/0
-      'ICW', // combiwatt indicator 1/0
-      'ITS', // test indicator 1/0
-      'IDST', // daylight saving indicator 1/0
-      'ISC', // SCGateway module indicator 1/0
-      'SRT', // Sun rise time HH:MM
-      'DW', // day of week 0(Mon)-6(Sun)
-      'DaR', // wattrouter date
-      'TiR', // wattrouter time
-    ];
-
-    for (const i of s) {
-      if (i in json.meas) {
-        log.debug(`Publish: ${i}=${json.meas[i]}`);
-        mqtt.client.publish(`${rt}/${i}`, json.meas[i].toString());
-      }
+  log.debug(`Parsed ${JSON.stringify(json)}`);
+  // process inputs
+  for (let i = 1; i < 8; i++) {
+    const itm = `I${i}`;
+    if (itm in json.meas) {
+      mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
+      log.debug(`Publish: ${itm}/P=${json.meas[itm].P.toFixed(2)}`);
     }
-  } catch (error) {
-    log.error(error.message);
+  }
+  // process outputs
+  for (let i = 1; i < 15; i++) {
+    const itm = `O${i}`;
+    if (itm in json.meas) {
+      mqtt.client.publish(`${rt}/${itm}/P`, json.meas[itm].P.toFixed(2));
+      mqtt.client.publish(`${rt}/${itm}/HN`, json.meas[itm].HN.toString());
+      mqtt.client.publish(`${rt}/${itm}/T`, json.meas[itm].T.toString());
+      log.debug(
+        `Publish: ${itm} P=${json.meas[itm].P.toFixed(2)} HN=${json.meas[itm].HN} T=${
+          json.meas[itm].T
+        }`
+      );
+    }
+  }
+
+  // total power
+  if ('PPS' in json.meas) {
+    mqtt.client.publish(`${rt}/PPS`, json.meas.PPS.toFixed(2));
+    log.info(`PPS=${json.meas.PPS}`);
+  } else {
+    log.error('PPS attribute not present.');
+  }
+
+  const s = [
+    'DQ1',
+    'DQ2',
+    'DQ3',
+    'DQ4', // temp sensors
+    'VAC', // voltage
+    'EL1', // L1 voltage error 1/0
+    'ETS', // temperature sensor error 1/0
+    'ILT', // low-tariff indicator 1/0
+    'ICW', // combiwatt indicator 1/0
+    'ITS', // test indicator 1/0
+    'IDST', // daylight saving indicator 1/0
+    'ISC', // SCGateway module indicator 1/0
+    'SRT', // Sun rise time HH:MM
+    'DW', // day of week 0(Mon)-6(Sun)
+    'DaR', // wattrouter date
+    'TiR', // wattrouter time
+  ];
+
+  for (const i of s) {
+    if (i in json.meas) {
+      log.debug(`Publish: ${i}=${json.meas[i]}`);
+      mqtt.client.publish(`${rt}/${i}`, json.meas[i].toString());
+    }
   }
 }
 
