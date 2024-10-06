@@ -9,7 +9,7 @@ let isRunning = true;
 
 mqtt.client.on('connect', function () {
   if (mqtt.client.disconnecting) return;
-  const topic = `${ENV.config.mqtt?.clientid ?? ''}/cmd`;
+  const topic = `${ENV.config.mqtt?.client_id ?? ''}/cmd`;
   log.info(`Subscribing to topic=${topic}`);
   mqtt.addHandler(topic, function (cmd): boolean {
     log.info(`Received command = ${cmd}`);
@@ -25,6 +25,7 @@ export function start() {
 
 export function stop() {
   log.info('Stopping Wattrouter Bridge');
+  mqtt.client.publish(mqtt.LWTtopic, 'OFF', { qos: 1, retain: true });
 
   setTimeout(() => {
     mqtt.client.end();
@@ -33,7 +34,7 @@ export function stop() {
 }
 
 export async function readWR() {
-  const rt = ENV.config.mqtt.clientid;
+  const rt = ENV.config.mqtt.client_id;
   const url = `${ENV.config.wattrouter.host}/meas.xml`;
   log.debug(`Connecting to wattrouter host=${url}`);
   let json: any;
@@ -119,14 +120,14 @@ export async function readWR() {
 }
 
 let lastAlive = 0;
-const aliveInterval = 1000 * 60 * 15;
+const aliveInterval = 1000 * 60 * 5;
 let lastRead = 0;
 
 function loop() {
   if (Date.now() - lastAlive > aliveInterval) {
     log.info('Wattrouter alive');
     lastAlive = Date.now();
-    mqtt.client.publish(`${ENV.config.mqtt?.clientid}/alive`, new Date().toISOString(), {
+    mqtt.client.publish(`${ENV.config.mqtt?.client_id}/alive`, new Date().toISOString(), {
       qos: 1,
       retain: true,
     });

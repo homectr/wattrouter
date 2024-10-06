@@ -33,20 +33,24 @@ export const argv = yargs
 
 interface FileConfig {
   mqtt: {
-    clientid: string;
+    /** mqtt client id **/
+    client_id: string;
+    /** mqtt host address **/
     host: string;
     username?: string;
     password?: string;
   };
   wattrouter: {
+    /** wattrouter host address **/
     host: string;
+    /** interval in seconds to poll wattrouter **/
     interval: number;
   };
 }
 
 const defaultConfig: FileConfig = {
   mqtt: {
-    clientid: 'wattrouter',
+    client_id: 'wattrouter',
     host: 'tcp://localhost',
   },
   wattrouter: {

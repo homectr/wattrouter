@@ -1,0 +1,10 @@
+name: wattrouter
+
+services:
+  wattrouter:
+    restart: always
+    image: sovcik/wattrouter:latest
+    container_name: wattrouter
+    volumes:
+      - ${WATTROUTER_LOG_FOLDER}:/var/log/wattrouter
+      - ${WATTROUTER_CONFIG_FOLDER}:/app/cfg

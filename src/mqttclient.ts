@@ -4,12 +4,22 @@ import logger from './logger';
 
 const log = logger.child({ module: 'mqttc' });
 
-log.info(`connecting to ${ENV.config.mqtt?.host}`);
-export const client = mqtt.connect(ENV.config.mqtt?.host, {
-  clientId: ENV.config.mqtt?.clientid,
+export const LWTtopic = `${ENV.config.mqtt?.client_id}/status`;
+
+const options: mqtt.IClientOptions = {
+  clientId: ENV.config.mqtt?.client_id,
   username: ENV.config.mqtt?.username,
   password: ENV.config.mqtt?.password,
-});
+  will: {
+    topic: LWTtopic,
+    payload: Buffer.from('OFF'),
+    qos: 1,
+    retain: true,
+  },
+};
+
+log.info(`Connecting to MQTT host ${ENV.config.mqtt?.host}: clientId=${options.clientId} username=${options?.username ?? 'none'} password=${options?.password ? 'yes' : 'no'}`);
+export const client = mqtt.connect(ENV.config.mqtt?.host, options);
 
 export type mgs_handler_t = (message: string) => boolean;
 
@@ -24,6 +34,7 @@ export function addHandler(topic: string, handler: mgs_handler_t) {
 
 client.on('connect', function () {
   log.debug('MQTT connected');
+  client.publish(LWTtopic, 'ON', { qos: 1, retain: true });
 });
 
 client.on('error', function (err) {

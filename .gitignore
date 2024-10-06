@@ -4,7 +4,6 @@ dist
 .env
 .vscode
 
-*.log
-*.cfg
-
 local
+
+.yarn/install-state.gz
