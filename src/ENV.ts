@@ -62,10 +62,14 @@ const defaultConfig: FileConfig = {
 export const config = readConfig(argv.config);
 
 export function readConfig(cfgFileName: string): FileConfig {
-  const data = fs.readFileSync(cfgFileName, { encoding: 'utf8', flag: 'r' });
-  console.log('Reading configuration from %s', cfgFileName);
-  let cfg: FileConfig = defaultConfig;
+  let cfg: FileConfig = defaultConfig; 
+  if (!fs.existsSync(cfgFileName)) {
+    console.error(`Configuration file ${cfgFileName} not found. If you are running in a container, you may need to check the configuration file in mounted location.`);
+    process.exit(1);
+  }
   try {
+    const data = fs.readFileSync(cfgFileName, { encoding: 'utf8', flag: 'r' });
+    console.log('Reading configuration from %s', cfgFileName); 
     cfg = JSON.parse(data);
   } catch (err) {
     console.error(`Error reading configuration from ${cfgFileName} err=${err}`);
