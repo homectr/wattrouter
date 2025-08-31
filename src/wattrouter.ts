@@ -37,7 +37,7 @@ export async function readWR() {
   const rt = ENV.config.mqtt.client_id;
   const url = `${ENV.config.wattrouter.host}/meas.xml`;
   log.debug(`Connecting to wattrouter host=${url}`);
-  let json: any;
+  let json:any;
   try {
     const { data } = await axios.get(url, {
       timeout: 1000,
@@ -61,6 +61,10 @@ export async function readWR() {
   }
 
   log.debug(`Parsed ${JSON.stringify(json)}`);
+  if (!json || !('meas' in json)) {
+    log.error('No measurements receiverd from Wattrouter');
+    return;
+  }
   // process inputs
   for (let i = 1; i < 8; i++) {
     const itm = `I${i}`;
@@ -85,7 +89,7 @@ export async function readWR() {
   }
 
   // total power
-  if ('PPS' in json.meas) {
+  if (json && 'PPS' in json.meas) {
     mqtt.client.publish(`${rt}/PPS`, json.meas.PPS.toFixed(2));
     log.info(`PPS=${json.meas.PPS}`);
   } else {
